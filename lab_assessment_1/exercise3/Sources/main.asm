@@ -29,7 +29,8 @@ ROMStart    EQU  $4000  ; absolute address to place my code/constant data
  ; Insert here your data definition.
 Counter     DS.W 1
 FiboRes     DS.W 1
-WORD FCB $4D,$65,$6D,$6F,$72,$79,$0D,$00
+WORD FCB $4D,$65,$6D,$6F,$72,$79,$0A,$0D,$00
+READ RMB 80
 
 ; code section
             ORG   ROMStart
@@ -56,23 +57,81 @@ _Startup:
  endif
 
             CLI                     ; enable interrupts
+mainLoop: 
 
-  
-mainLoop:
-  LDX #WORD  
-  LOOP:
-    LDAA X
-    INX
-    CMPA $00
-    BEQ test
-    bra LOOP
+  ;bsr task1
+  bsr task2
     
-test:
-          ldaa #00
-          bra mainLoop
-  
-  
 
+task1: LDX #WORD    ; loads word pointer into X register
+    
+    
+    
+    
+    task1_LOOP:
+    LDAA 1,X+     ; loads value at X into accumulator A & increment
+    CMPA #$00      ; comparing value in A to 0 
+    BEQ delay      ; branch if 0 is reached (null character)
+    
+    bsr loadSCI1
+    bra task1_LOOP
+    
+
+task2: LDX #READ
+    
+    bsr readSCI1
+    
+relay: LDX #READ
+
+relay_LOOP:
+    LDAA 1,X+     ; loads value at X into accumulator A & increment
+    CMPA #$00      ; comparing value in A to 0 
+    BEQ delay      ; branch if 0 is reached (null character)
+    
+    bsr loadSCI1
+    bra relay_LOOP
+
+loadSCI1:
+    MOVB #$00, SCI1BDH
+    MOVB #156, SCI1BDL
+    MOVB #$00, SCI1CR1
+    MOVB #$08, SCI1CR2
+    brclr SCI1SR1,mSCI1SR1_TDRE,*    ; waits for TDRE to be set
+    staa SCI1DRL           ; outputs the character
+    rts
+    
+    
+
+readSCI1: 
+    MOVB #00, SCI1BDH
+    MOVB #156, SCI1BDL
+    MOVB #mSCI1CR2_RE, SCI1CR2
+    brclr SCI1SR1, mSCI1SR1_RDRF,*
+    LDAA SCI1DRL
+    STAA 1,X+
+    CMPA #$D
+    BEQ complete_string
+    bra readSCI1
+    
+complete_string:
+    LDAA #$A    
+    STAA 1,X+
+    LDAA #00
+    STAA 1,X+
+    bra relay
+
+delay:
+   
+    LDX #60000
+LOOP1:
+    LDAA #100
+LOOP2:
+    NOP
+    DBNE A, LOOP2
+    DBNE X, LOOP1
+        
+          
+    bra mainLoop
 
 ;**************************************************************
 ;*                 Interrupt Vectors                          *
